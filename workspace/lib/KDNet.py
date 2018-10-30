@@ -150,7 +150,7 @@ class KDNetwork:
         KDNet['output'] = DenseLayer(KDNet['cloud_fin_reshape'], config['n_output'], nonlinearity=softmax)
 
         # Loading weights (optional)
-        load_weights('./KDNetwork/models/RT_AS+TR_2D_MNIST.pkl', KDNet['output'])
+        load_weights('lib/KDNetwork/models/RT_AS+TR_2D_MNIST.pkl', KDNet['output'])
 
         self.net = KDNet
 

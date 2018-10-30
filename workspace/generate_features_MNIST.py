@@ -14,12 +14,19 @@ from lasagne.layers import get_output, get_all_params
 
 from lib.KDNet import KDNetwork, iterate_minibatches
 
+#################
+### Load data ###
+#################
 
 with h5.File('../datasets/MNIST_2D/mnist2d.h5', 'r') as hf:
     X_train = np.array(hf.get('X_train'))
     y_train = np.array(hf.get('y_train'))
     X_test = np.array(hf.get('X_test'))
     y_test = np.array(hf.get('y_test'))
+
+##############
+### Config ###
+##############
 
 config = {
     # General
@@ -50,10 +57,17 @@ config = {
     'n_ens': 16 # number of predicts (take average)
 }
 
+######################
+### KDNetwork Init ###
+######################
+
 model = KDNetwork(config)
-clouds, norms = KDNetwork.clouds, KDNetwork.norms
+clouds, norms = model.clouds, model.norms
 KDNet = model.net
 
+##################
+### Generating ###
+##################
 
 def generate(X, y, X_name):
     all_factors = []
@@ -89,11 +103,11 @@ def generate(X, y, X_name):
         features = features_fun(*(batch[:-1]))
         root.append(features)
 
-    root = np.concatenate(root, axis=0).reshape(len(X_test), -1)
+    root = np.concatenate(root, axis=0).reshape(len(X), -1)
 
     path = '../datasets/MNIST_2D/kd_features/' + X_name + '/'
 
-    np.save(path + 'X_' + X_name + '_256x3.npy', X_test)
+    np.save(path + 'X_' + X_name + '_256x3.npy', X)
     np.save(path + 'X_' + X_name + '_128x(3+32).npy', all_factors[0])
     np.save(path + 'X_' + X_name + '_064x(3+32).npy', all_factors[1])
     np.save(path + 'X_' + X_name + '_032x(3+64).npy', all_factors[2])
