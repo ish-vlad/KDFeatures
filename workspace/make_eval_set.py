@@ -35,23 +35,29 @@ def get_rotation_matrix(alpha):
 
 
 def transform_clouds(clouds, alpha, vector):
-    if np.sum(np.abs(alpha)) != 0:
-        # center clouds (for rotation)
-        bias = np.mean(clouds, axis=1).reshape(-1, 1, 2)
-        clouds = clouds - bias
+    # center clouds (for rotation)
+    bias = np.mean(clouds, axis=1).reshape(-1, 1, 2)
+    clouds = clouds - bias
 
-        # rotation
-        Ts = get_rotation_matrix(alpha)
-        rotated_clouds = np.einsum('npi,jin->npj', clouds, Ts)
-        rotated_clouds += bias
-    else:
-        rotated_clouds = clouds
+    # rotation
+    Ts = get_rotation_matrix(alpha)
+    rotated_clouds = np.einsum('npi,jin->npj', clouds, Ts)
+    rotated_clouds += bias
 
     # translation
-    diameter = (np.max(clouds, axis=1) - np.min(clouds, axis=1)).reshape(-1, 1, 2)
-    final_clouds = rotated_clouds + vector * diameter
+    final_clouds = rotated_clouds + vector
 
-    return final_clouds
+    # rotation of bias vector
+    bias = bias.reshape(-1, 2)
+    bias_rotated = np.einsum('ni,jin->nj', bias, Ts)
+
+    transformation = np.zeros((len(clouds), 4, 4))
+    transformation[:, :2, :2] = Ts.transpose(2, 0, 1)
+    transformation[:, :2, -1] = vector[:, 0, :] + bias - bias_rotated
+    transformation[:, 2, 2] = np.ones(len(clouds))
+    transformation[:, -1, -1] = np.ones(len(clouds))
+
+    return final_clouds, transformation
 
 
 def itoa(number, digits):
@@ -91,13 +97,13 @@ for alpha in rotation_range:
     alphas = np.pi/180 * alphas
 
     # rotate
-    clouds_pair = transform_clouds(dataset, alphas,  np.zeros(dataset.shape[-1]))
+    clouds_pair, trans = transform_clouds(dataset, alphas, np.zeros((len(dataset), 1, 2)))
 
     # save models
-    for i, pc, pc_rot in zip(range(len(dataset)), dataset, clouds_pair):
+    for i, pc, pc_rot, t in zip(range(len(dataset)), dataset, clouds_pair, trans):
         name = np.abs(alphas[i] * 180 / np.pi)
         name = 'pair-' + itoa(i, 4) + '_rot-' + itoa(int(name), 3) + '.pkl'
-        dump((pc, pc_rot), open(os.path.join(directory, name), 'wb+'))
+        dump((pc, pc_rot, t), open(os.path.join(directory, name), 'wb+'))
 
 #########################
 # Translation
@@ -112,13 +118,13 @@ for factor in translation_range:
     factors = factor*(rand*2-1)
 
     # translate
-    clouds_pair = transform_clouds(dataset, 0, factors)
+    clouds_pair, trans = transform_clouds(dataset, np.zeros(len(dataset)), factors)
 
     # save models
-    for i, pc, pc_rot in zip(range(len(dataset)), dataset, clouds_pair):
+    for i, pc, pc_rot, t in zip(range(len(dataset)), dataset, clouds_pair, trans):
         name = np.abs(factors[i])[0]
         name = 'pair-' + itoa(i, 4) + '_trans-' + ('[%.4f,%.4f]' % (name[0], name[1])) + '.pkl'
-        dump((pc, pc_rot), open(os.path.join(directory, name), 'wb+'))
+        dump((pc, pc_rot, t), open(os.path.join(directory, name), 'wb+'))
 
 #########################
 # Rotation & Translation
@@ -140,10 +146,10 @@ for alpha, factor in zip(rotation_range, translation_range):
     factors = factor*(rand*2-1)
 
     # rotate
-    clouds_pair = transform_clouds(dataset, alphas, factors)
+    clouds_pair, trans = transform_clouds(dataset, alphas, factors)
 
     # save models
-    for i, pc, pc_rot in zip(range(len(dataset)), dataset, clouds_pair):
+    for i, pc, pc_rot, t in zip(range(len(dataset)), dataset, clouds_pair, trans):
         name = 'pair-' + itoa(i, 4)
 
         buf = np.abs(alphas[i] * 180 / np.pi)
@@ -153,4 +159,4 @@ for alpha, factor in zip(rotation_range, translation_range):
         name += '_trans-' + ('[%.4f,%.4f]' % (buf[0], buf[1]))
 
         name += '.pkl'
-        dump((pc, pc_rot), open(os.path.join(directory, name), 'wb+'))
+        dump((pc, pc_rot, t), open(os.path.join(directory, name), 'wb+'))

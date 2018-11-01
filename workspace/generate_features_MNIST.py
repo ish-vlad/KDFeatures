@@ -14,16 +14,6 @@ from lasagne.layers import get_output, get_all_params
 
 from lib.KDNet import KDNetwork, iterate_minibatches
 
-#################
-### Load data ###
-#################
-
-with h5.File('../datasets/MNIST_2D/mnist2d.h5', 'r') as hf:
-    X_train = np.array(hf.get('X_train'))
-    y_train = np.array(hf.get('y_train'))
-    X_test = np.array(hf.get('X_test'))
-    y_test = np.array(hf.get('y_test'))
-
 ##############
 ### Config ###
 ##############
@@ -57,22 +47,20 @@ config = {
     'n_ens': 16 # number of predicts (take average)
 }
 
-######################
-### KDNetwork Init ###
-######################
-
-model = KDNetwork(config)
-clouds, norms = model.clouds, model.norms
-KDNet = model.net
-
 ##################
 ### Generating ###
 ##################
 
-def generate(X, y, X_name):
+
+def generate(X, y, config):
+    # init KD Network
+    model = KDNetwork(config)
+    clouds, norms = model.clouds, model.norms
+    KDNet = model.net
+
     all_factors = []
     # for each factor
-    for factor in range(1,8):
+    for factor in range(1, 8):
         features_det = get_output(KDNet['cloud{}'.format(factor+1)], deterministic=True)
         features_fun = theano.function([clouds] + norms, features_det, on_unused_input='ignore')
 
@@ -103,8 +91,12 @@ def generate(X, y, X_name):
         features = features_fun(*(batch[:-1]))
         root.append(features)
 
-    root = np.concatenate(root, axis=0).reshape(len(X), -1)
+    root = np.concatenate(root, axis=0).reshape(1, len(X), -1)
 
+    return all_factors + [root]
+
+
+def save(X, X_name, all_factors):
     path = '../datasets/MNIST_2D/kd_features/' + X_name + '/'
 
     np.save(path + 'X_' + X_name + '_256x3.npy', X)
@@ -115,8 +107,22 @@ def generate(X, y, X_name):
     np.save(path + 'X_' + X_name + '_008x(3+128).npy', all_factors[4])
     np.save(path + 'X_' + X_name + '_004x(3+256).npy', all_factors[5])
     np.save(path + 'X_' + X_name + '_002x(3+512).npy', all_factors[6])
-    np.save(path + 'X_' + X_name + '_001x128(root).npy', root)
+    np.save(path + 'X_' + X_name + '_001x128(root).npy', all_factors[7])
 
 
-generate(X_train, y_train, 'train')
-generate(X_test, y_test, 'test')
+if __name__ == '__main__':
+    # load data
+    with h5.File('../datasets/MNIST_2D/mnist2d.h5', 'r') as hf:
+        X_train = np.array(hf.get('X_train'))
+        y_train = np.array(hf.get('y_train'))
+        X_test = np.array(hf.get('X_test'))
+        y_test = np.array(hf.get('y_test'))
+
+    # generating
+    features = generate(X_train, y_train, config)
+    save(X_train, 'train', features)
+
+    features = generate(X_test, y_test, config)
+    save(X_train, 'test', features)
+
+
