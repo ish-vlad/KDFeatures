@@ -141,6 +141,7 @@ def get_zip_over_batch(source, target, transformation):
 
     return zip(*total_batch)
 
+
 def to_3D(pc_2d):
     if pc_2d.shape[-1] == 3:
         return pc_2d

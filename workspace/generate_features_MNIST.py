@@ -24,6 +24,7 @@ config = {
     'batchsize': 2000,
     'shuffle': False,
     # Augmentations
+    'augment': False,
     'flip': False,
     'ascale': True, 'as_min': 0.6667, 'as_max': 1.5,
     'rotate': False, 'r_positions': 12, 'test_pos': None,

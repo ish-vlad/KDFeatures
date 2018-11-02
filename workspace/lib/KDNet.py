@@ -12,6 +12,7 @@ from lasagne.layers import DenseLayer
 from lasagne.layers import BatchNormLayer
 from lasagne.nonlinearities import rectify, softmax
 
+import KDNetwork
 from KDNetwork.lib.nn.layers import SharedDotLayer, SPTNormReshapeLayer
 from KDNetwork.lib.nn.utils import load_weights
 from KDNetwork.lib.trees.kdtrees import KDTrees
@@ -150,7 +151,7 @@ class KDNetwork:
         KDNet['output'] = DenseLayer(KDNet['cloud_fin_reshape'], config['n_output'], nonlinearity=softmax)
 
         # Loading weights (optional)
-        load_weights('lib/KDNetwork/models/RT_AS+TR_2D_MNIST.pkl', KDNet['output'])
+        load_weights('/home/ishvlad/KDFeatures/workspace/lib/KDNetwork/models/RT_AS+TR_2D_MNIST.pkl', KDNet['output'])
 
         self.net = KDNet
 
@@ -168,41 +169,42 @@ def iterate_minibatches(*arrays, **kwargs):
         excerpt = indices[start_idx:start_idx + kwargs['batchsize']]
         tmp = np.transpose(arrays[0][excerpt], axes=(0,2,1))
 
-        # random flipping along x and y axes
-        if kwargs['flip']:
-            flip = np.random.random(size=(len(tmp), 2, 1))
-            flip[flip >= 0.5] = 1.
-            flip[flip < 0.5] = -1.
-            tmp[:, :2] *= flip
+        if kwargs['augment']:
+            # random flipping along x and y axes
+            if kwargs['flip']:
+                flip = np.random.random(size=(len(tmp), 2, 1))
+                flip[flip >= 0.5] = 1.
+                flip[flip < 0.5] = -1.
+                tmp[:, :2] *= flip
 
-        # stretch picture
-        if kwargs['ascale']:
-            tmp *= (kwargs['as_min'] + (kwargs['as_max'] - kwargs['as_min'])*np.random.random(size=(len(tmp), kwargs['dim'], 1)))
-            tmp = tmp / np.fabs(tmp).max(axis=(1, 2), keepdims=True)
+            # stretch picture
+            if kwargs['ascale']:
+                tmp *= (kwargs['as_min'] + (kwargs['as_max'] - kwargs['as_min'])*np.random.random(size=(len(tmp), kwargs['dim'], 1)))
+                tmp = tmp / np.fabs(tmp).max(axis=(1, 2), keepdims=True)
 
-        if kwargs['rotate']:
-            r = np.sqrt((tmp[:, :2]**2).sum(axis=1))
-            coss = tmp[:, 0]/r
-            sins = tmp[:, 1]/r
+            if kwargs['rotate']:
+                r = np.sqrt((tmp[:, :2]**2).sum(axis=1))
+                coss = tmp[:, 0]/r
+                sins = tmp[:, 1]/r
 
-            if kwargs['test_pos'] is not None:
-                alpha = 2*np.pi*kwargs['test_pos']/kwargs['r_positions']
-            else:
-                alpha = 2*np.pi*np.random.randint(0, kwargs['r_positions'], (len(tmp), 1))/kwargs['positions']
+                if kwargs['test_pos'] is not None:
+                    alpha = 2*np.pi*kwargs['test_pos']/kwargs['r_positions']
+                else:
+                    alpha = 2*np.pi*np.random.randint(0, kwargs['r_positions'], (len(tmp), 1))/kwargs['positions']
 
-            cosr = np.cos(alpha)
-            sinr = np.sin(alpha)
-            cos = coss*cosr - sins*sinr
-            sin = sins*cosr + sinr*coss
-            tmp[:, 0] = r*cos
-            tmp[:, 1] = r*sin
+                cosr = np.cos(alpha)
+                sinr = np.sin(alpha)
+                cos = coss*cosr - sins*sinr
+                sin = sins*cosr + sinr*coss
+                tmp[:, 0] = r*cos
+                tmp[:, 1] = r*sin
 
-        # translate along all axes
-        if kwargs['translate']:
-            mins = tmp.min(axis=2, keepdims=True)
-            maxs = tmp.max(axis=2, keepdims=True)
-            rngs = maxs - mins
-            tmp += kwargs['t_rate']*(np.random.random(size=(len(tmp), kwargs['dim'], 1)) - 0.5)*rngs
+            # translate along all axes
+            if kwargs['translate']:
+                mins = tmp.min(axis=2, keepdims=True)
+                maxs = tmp.max(axis=2, keepdims=True)
+                rngs = maxs - mins
+                tmp += kwargs['t_rate']*(np.random.random(size=(len(tmp), kwargs['dim'], 1)) - 0.5)*rngs
 
         trees_data = KDTrees(tmp[:,:2], dim=kwargs['dim']-1, steps=kwargs['steps'],
                                  lim=kwargs['lim'], det=kwargs['det'], gamma=kwargs['gamma'], medians=True)
