@@ -79,7 +79,6 @@ def generate(X, y, config):
             results.append(np.concatenate((sub_pcs, features), axis=1).transpose(0,2,1))
 
         all_factors.append(np.concatenate(results, axis=0))
-        print('factor', factor, 'Shape', all_factors[-1].shape)
 
     root = []
 
@@ -91,7 +90,7 @@ def generate(X, y, config):
         features = features_fun(*(batch[:-1]))
         root.append(features)
 
-    root = np.concatenate(root, axis=0).reshape(1, len(X), -1)
+    root = np.concatenate(root, axis=0).reshape(len(X), -1)
 
     return all_factors + [root]
 

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="e5215349-f748-4c1e-889d-4ded2098ffde" name="Thor.KDFeatures" url="http://thor.skoltech.ru">
+        <fileTransfer host="thor.skoltech.ru" port="22" rootFolder="/home/ishvlad/KDFeatures" accessType="SFTP">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" shareSSLContext="true" />
+          </advancedOptions>
+          <option name="port" value="22" />
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>
