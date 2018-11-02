@@ -10,6 +10,7 @@ from open3d import PointCloud, Vector3dVector, KDTreeSearchParamHybrid, \
 
 from generate_features_MNIST import config as KD_config
 from generate_features_MNIST import generate as generate_KD_features
+from lib.KDNet import transform_clouds, to_3D
 
 
 def make_eval(dataset, path_to_save, rotation_range = None, translation_range = None):
@@ -142,12 +143,6 @@ def get_zip_over_batch(source, target, transformation):
     return zip(*total_batch)
 
 
-def to_3D(pc_2d):
-    if pc_2d.shape[-1] == 3:
-        return pc_2d
-    return np.concatenate((pc_2d, np.zeros(pc_2d.shape[:-1] + (1,))), axis=-1)
-
-
 def to_ply(cloud):
     ply = PointCloud()
     ply.points = Vector3dVector(to_3D(cloud))
@@ -157,7 +152,7 @@ def to_ply(cloud):
 
 def get_features(clouds, voxel_size=0.01):
     clouds = to_3D(clouds)
-    KDs = generate_KD_features(clouds, np.ones(len(clouds)), KD_config)
+    KDs = generate_KD_features(clouds-clouds.mean(axis=1).reshape(-1,1,clouds.shape[-1]), np.ones(len(clouds)), KD_config)
     clouds_KD = clouds
     clouds_FPFH = []
     FPFHs = []
@@ -170,39 +165,6 @@ def get_features(clouds, voxel_size=0.01):
         clouds_FPFH.append(np.asarray(ply.points))
 
     return (clouds_KD, clouds_FPFH, [f.data for f in FPFHs]) + tuple(KDs)
-
-
-def get_rotation_matrix(alpha):
-    return np.array([
-        [np.cos(alpha), np.sin(alpha)],
-        [-np.sin(alpha), np.cos(alpha)]
-    ])
-
-
-def transform_clouds(clouds, alpha, vector):
-    # center clouds (for rotation)
-    bias = np.mean(clouds, axis=1).reshape(-1, 1, 2)
-    clouds = clouds - bias
-
-    # rotation
-    Ts = get_rotation_matrix(alpha)
-    rotated_clouds = np.einsum('npi,jin->npj', clouds, Ts)
-    rotated_clouds += bias
-
-    # translation
-    final_clouds = rotated_clouds + vector
-
-    # rotation of bias vector
-    bias = bias.reshape(-1, 2)
-    bias_rotated = np.einsum('ni,jin->nj', bias, Ts)
-
-    transformation = np.zeros((len(clouds), 4, 4))
-    transformation[:, :2, :2] = Ts.transpose(2, 0, 1)
-    transformation[:, :2, -1] = vector[:, 0, :] + bias - bias_rotated
-    transformation[:, 2, 2] = np.ones(len(clouds))
-    transformation[:, -1, -1] = np.ones(len(clouds))
-
-    return final_clouds, transformation
 
 
 def itoa(number, digits):

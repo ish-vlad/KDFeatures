@@ -199,6 +199,11 @@ def iterate_minibatches(*arrays, **kwargs):
                 tmp[:, 0] = r*cos
                 tmp[:, 1] = r*sin
 
+            if kwargs['mRotate']:
+                alphas = np.pi * (np.random.rand(len(tmp)) * 2 - 1)
+                tmp, _ = transform_clouds(tmp.transpose(0,2,1)[:,:,:2], alphas, np.zeros((len(tmp), 1, 2)))
+                tmp = to_3D(tmp.transpose(0,2,1))
+
             # translate along all axes
             if kwargs['translate']:
                 mins = tmp.min(axis=2, keepdims=True)
@@ -206,7 +211,7 @@ def iterate_minibatches(*arrays, **kwargs):
                 rngs = maxs - mins
                 tmp += kwargs['t_rate']*(np.random.random(size=(len(tmp), kwargs['dim'], 1)) - 0.5)*rngs
 
-        trees_data = KDTrees(tmp[:,:2], dim=kwargs['dim']-1, steps=kwargs['steps'],
+        trees_data = KDTrees(tmp, dim=kwargs['dim'], steps=kwargs['steps'],
                                  lim=kwargs['lim'], det=kwargs['det'], gamma=kwargs['gamma'], medians=True)
 
         sortings, normals = trees_data['sortings'], trees_data['normals']
@@ -218,7 +223,47 @@ def iterate_minibatches(*arrays, **kwargs):
         elif kwargs['input_features'] == 'no':
             clouds = np.ones((len(excerpt), 1, 2**kwargs['steps']), dtype=np.float32)
 
+        clouds = to_3D(clouds.transpose(0,2,1)).transpose(0,2,1)
         if kwargs['mode'] == 'train':
             yield [clouds] + normals[::-1] + [arrays[1][excerpt]]
         if kwargs['mode'] == 'test':
             yield [clouds] + normals[::-1] + [excerpt]
+
+
+def get_rotation_matrix(alpha):
+    return np.array([
+        [np.cos(alpha), np.sin(alpha)],
+        [-np.sin(alpha), np.cos(alpha)]
+    ])
+
+
+def transform_clouds(clouds, alpha, vector):
+    # center clouds (for rotation)
+    bias = np.mean(clouds, axis=1).reshape(-1, 1, clouds.shape[-1])
+    clouds = clouds - bias
+
+    # rotation
+    Ts = get_rotation_matrix(alpha)
+    rotated_clouds = np.einsum('npi,jin->npj', clouds, Ts)
+    rotated_clouds += bias
+
+    # translation
+    final_clouds = rotated_clouds + vector
+
+    # rotation of bias vector
+    bias = bias.reshape(-1, 2)
+    bias_rotated = np.einsum('ni,jin->nj', bias, Ts)
+
+    transformation = np.zeros((len(clouds), 4, 4))
+    transformation[:, :2, :2] = Ts.transpose(2, 0, 1)
+    transformation[:, :2, -1] = vector[:, 0, :] + bias - bias_rotated
+    transformation[:, 2, 2] = np.ones(len(clouds))
+    transformation[:, -1, -1] = np.ones(len(clouds))
+
+    return final_clouds, transformation
+
+
+def to_3D(pc_2d):
+    if pc_2d.shape[-1] == 3:
+        return pc_2d
+    return np.concatenate((pc_2d, np.zeros(pc_2d.shape[:-1] + (1,))), axis=-1)
