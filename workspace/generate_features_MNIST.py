@@ -11,6 +11,7 @@ import h5py as h5
 import numpy as np
 
 from lasagne.layers import get_output, get_all_params
+from open3d import estimate_normals, KDTreeSearchParamHybrid, compute_fpfh_feature, PointCloud, Vector3dVector
 
 from lib.KDNet import KDNetwork, iterate_minibatches
 
@@ -30,13 +31,13 @@ config = {
     'rotate': False, 'r_positions': 12, 'test_pos': None,
     'translate': False, 't_rate': 0.1,
     # Point clouds and kd-trees generation
-    'steps': 8, # also control the depth of the network
+    'steps': 8,  # also control the depth of the network
     'dim': 3,
     'lim': 1,
     'det': False,
     'gamma': 10.,
     # NN options
-    'input_features': 'all', # 'all' for point coordinates, 'no' for feeding 1's as point features
+    'input_features': 'all',  # 'all' for point coordinates, 'no' for feeding 1's as point features
     'n_f': [16,
             32,  32,
             64,  128,
@@ -51,6 +52,24 @@ config = {
 ##################
 ### Generating ###
 ##################
+def to_ply(cloud):
+    ply = PointCloud()
+    ply.points = Vector3dVector(cloud)
+
+    return ply
+
+
+def append_FPFH(clouds, voxel_size):
+    FPFHs = []
+    for pc in tqdm.tqdm(clouds.transpose(0, 2, 1)):
+        ply = to_ply(pc)
+        # ply = voxel_down_sample(ply, voxel_size)
+        estimate_normals(ply, KDTreeSearchParamHybrid(radius=voxel_size * 2, max_nn=30))
+        fpfh = compute_fpfh_feature(ply, KDTreeSearchParamHybrid(radius=voxel_size * 10, max_nn=100))
+        FPFHs.append(fpfh.data.T)
+
+    FPFHs = np.array(FPFHs).transpose(0, 2, 1)
+    return FPFHs
 
 
 def generate(X, y, config):
@@ -67,9 +86,12 @@ def generate(X, y, config):
 
         # for each batch of pointclouds
         results = []
-        for i, batch in tqdm.tqdm(enumerate(iterate_minibatches(X, y, **config))):
+        for i, (batch, coords) in enumerate(iterate_minibatches(X, y, **config)):
+            # fpfh = append_FPFH(coords, 0.01)
+            # batch[0] = np.concatenate((batch[0], fpfh), axis=1)
+
             # divide by sub-pointclouds
-            sub_pcs = batch[0].reshape(batch[0].shape[:2] + (-1, 2**factor))
+            sub_pcs = coords.reshape(coords.shape[0], 3, -1, 2**factor)
 
             # take center of mass
             sub_pcs = sub_pcs.mean(axis=-1)
@@ -86,7 +108,10 @@ def generate(X, y, config):
     features_det = get_output(KDNet['cloud_fin_bn'], deterministic=True)
     features_fun = theano.function([clouds] + norms, features_det, on_unused_input='ignore')
 
-    for i, batch in enumerate(iterate_minibatches(X, y, **config)):
+    for i, (batch, coords) in enumerate(iterate_minibatches(X, y, **config)):
+        # fpfh = append_FPFH(coords, 0.01)
+        # batch[0] = np.concatenate((batch[0], fpfh), axis=1)
+
         # take features from KD
         features = features_fun(*(batch[:-1]))
         root.append(features)
