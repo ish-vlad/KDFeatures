@@ -39,11 +39,8 @@ def predict_all(path):
     T_preds = []
     times = []
 
-    source_pc = to_ply(batch.source_KD_cloud)
-    target_pc = to_ply(batch.target_KD_cloud)
-
-    source_pc_downsampled = to_ply(batch.source_FPFH_cloud)
-    target_pc_downsampled = to_ply(batch.target_FPFH_cloud)
+    source_pc = to_ply(batch.source_cloud)
+    target_pc = to_ply(batch.target_cloud)
 
     source_features = Feature()
     target_features = Feature()
@@ -54,12 +51,11 @@ def predict_all(path):
     times.append(time.time() - start)
 
     # FGR with coords only
-    source_features.data = batch.source_FPFH_cloud.T
-    target_features.data = batch.target_FPFH_cloud.T
+    source_features.data = batch.source_cloud.T
+    target_features.data = batch.target_cloud.T
 
     start = time.time()
-    T_preds.append(predict_fgr(source_pc_downsampled, target_pc_downsampled,
-                               source_features, target_features))
+    T_preds.append(predict_fgr(source_pc, target_pc, source_features, target_features))
     times.append(time.time() - start)
 
     # FGR with FPFH
@@ -67,8 +63,7 @@ def predict_all(path):
     target_features.data = batch.target_FPFH_features
 
     start = time.time()
-    T_preds.append(predict_fgr(source_pc_downsampled, target_pc_downsampled,
-                               source_features, target_features))
+    T_preds.append(predict_fgr(source_pc, target_pc, source_features, target_features))
     times.append(time.time() - start)
 
     # FGR with KD features
