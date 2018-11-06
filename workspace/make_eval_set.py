@@ -14,6 +14,9 @@ from lib.KDNet import transform_clouds, to_3D
 
 
 def make_eval(dataset, path_to_save, rotation_range = None, translation_range = None):
+    import theano
+    theano.config.mode = 'FAST_COMPILE'
+
     if rotation_range is not None and translation_range is None:
         #########################
         # Rotation
@@ -113,29 +116,27 @@ def make_eval(dataset, path_to_save, rotation_range = None, translation_range = 
 
 class Store:
     def __init__(self, batch):
-        len_kd = (len(batch) - 8) / 2
+        len_kd = (len(batch) - 6) / 2
 
         self.pair_num = batch[0]
         self.T_true = batch[1]
 
-        self.source_KD_cloud = batch[2]
-        self.source_FPFH_cloud = batch[3]
-        self.source_FPFH_features = batch[4]
-        self.source_KD_features = batch[5: 5 + len_kd - 1]
-        self.source_KD_root = batch[5 + len_kd - 1]
+        self.source_cloud = batch[2]
+        self.source_FPFH_features = batch[3]
+        self.source_KD_features = batch[4: 4 + len_kd - 1]
+        self.source_KD_root = batch[4 + len_kd - 1]
 
-        self.target_KD_cloud = batch[5 + len_kd]
-        self.target_FPFH_cloud = batch[6 + len_kd]
-        self.target_FPFH_features = batch[7 + len_kd]
-        self.target_KD_features = batch[8 + len_kd: 8 + len_kd  + len_kd - 1]
-        self.target_KD_root = batch[8 + len_kd + len_kd - 1]
+        self.target_cloud = batch[4 + len_kd]
+        self.target_FPFH_features = batch[5 + len_kd]
+        self.target_KD_features = batch[6 + len_kd: 6 + len_kd + len_kd - 1]
+        self.target_KD_root = batch[6 + len_kd + len_kd - 1]
 
 
 def get_zip_over_batch(source, target, transformation):
-    # source_KD, source_FPFH, source_KD_features, source_FPFH_features = source_batch
+    # source_cloud, source_KD_features, source_FPFH_features = source_batch
     source_batch = get_features(source)
 
-    # target_KD, target_FPFH, target_KD_features, target_FPFH_features = target_batch
+    # target_cloud, target_FPFH, target_KD_features, target_FPFH_features = target_batch
     target_batch = get_features(target)
 
     total_batch = (range(len(source)), transformation) + source_batch + target_batch
@@ -152,19 +153,17 @@ def to_ply(cloud):
 
 def get_features(clouds, voxel_size=0.01):
     clouds = to_3D(clouds)
-    KDs = generate_KD_features(clouds-clouds.mean(axis=1).reshape(-1,1,clouds.shape[-1]), np.ones(len(clouds)), KD_config)
-    clouds_KD = clouds
-    clouds_FPFH = []
+
+    KDs = generate_KD_features(clouds, np.ones(len(clouds)), KD_config)
     FPFHs = []
     for pc in tqdm.tqdm(clouds):
         ply = to_ply(pc)
-        ply = voxel_down_sample(ply, voxel_size)
+        # ply = voxel_down_sample(ply, voxel_size)
         estimate_normals(ply, KDTreeSearchParamHybrid(radius=voxel_size * 2, max_nn=30))
-        fpfh = compute_fpfh_feature(ply, KDTreeSearchParamHybrid(radius=voxel_size * 5, max_nn=100))
+        fpfh = compute_fpfh_feature(ply, KDTreeSearchParamHybrid(radius=voxel_size * 10, max_nn=100))
         FPFHs.append(fpfh)
-        clouds_FPFH.append(np.asarray(ply.points))
 
-    return (clouds_KD, clouds_FPFH, [f.data for f in FPFHs]) + tuple(KDs)
+    return (clouds, [f.data for f in FPFHs]) + tuple(KDs)
 
 
 def itoa(number, digits):
@@ -199,7 +198,7 @@ if __name__ == "__main__":
 
     path_rotate = '../datasets/MNIST_2D/Rotation/'
     path_translate = '../datasets/MNIST_2D/Translation/'
-    path_rotate_and_translate = '../datasets/MNIST_2D/Rotation_and_Translation/'
+    # path_rotate_and_translate = '../datasets/MNIST_2D/Rotation_and_Translation/'
 
     with h5.File('../datasets/MNIST_2D/mnist2d.h5', 'r') as hf:
         dataset = np.array(hf.get('X_test'))[:1000, :, :2]
@@ -208,5 +207,5 @@ if __name__ == "__main__":
     print('Rotation Done')
     make_eval(dataset, path_translate, translation_range=translation_range)
     print('Translation done')
-    make_eval(dataset, path_rotate_and_translate, rotation_range=rotation_range, translation_range=translation_range)
-    print('Rotation and translation done')
+    # make_eval(dataset, path_rotate_and_translate, rotation_range=rotation_range, translation_range=translation_range)
+    # print('Rotation and translation done')
