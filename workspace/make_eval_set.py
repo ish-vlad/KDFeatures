@@ -201,7 +201,7 @@ if __name__ == "__main__":
     # path_rotate_and_translate = '../datasets/MNIST_2D/Rotation_and_Translation/'
 
     with h5.File('../datasets/MNIST_2D/mnist2d.h5', 'r') as hf:
-        dataset = np.array(hf.get('X_test'))[:1000, :, :2]
+        dataset = np.array(hf.get('X_test'))[:100, :, :2]
 
     make_eval(dataset, path_rotate, rotation_range=rotation_range)
     print('Rotation Done')

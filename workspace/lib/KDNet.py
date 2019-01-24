@@ -17,17 +17,12 @@ from KDNetwork.lib.trees.kdtrees import KDTrees
 
 
 class KDNetwork:
-    def __init__(self, config, model_name='MNIST_2D.v2.1.triplet.pkl'):
-        '''
-            'RT_AS+TR_2D_MNIST.pkl' - v0
-            'MNIST_2D.v1.2.one_direction.pkl' - v1.2
-            'MNIST_2D.v1.3.svd.pkl' - v1.3
-            'MNIST_2D.v1.4.fpfh.pkl' = v1.4
-        '''
+    def __init__(self, config, model_name='MNIST_2D_512.v3.1.pkl'):
         self.clouds = T.tensor3(dtype='float64', name='clouds')
         self.norms = [T.tensor3(dtype='float64', name='norms{}'.format(i)) for i in xrange(config['steps'])]
         self.target = T.vector(dtype='int64')
-
+        self.model_name = model_name
+        print(self.model_name)
         self.inputs = [self.clouds, self.norms, self.target]
 
         KDNet = {}
@@ -89,67 +84,96 @@ class KDNetwork:
             #####################
             ### One direction ###
             #####################
-
-            # KDNet['cloud{}_l_X-'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_l'.format(i + 1)], config['n_f'][i + 1])
-            # KDNet['cloud{}_l_Y-'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_l'.format(i + 1)], config['n_f'][i + 1],
-            #                                                      W=KDNet['cloud{}_l_X-'.format(i + 1)].W,
-            #                                                      b=KDNet['cloud{}_l_X-'.format(i + 1)].b)
-            # KDNet['cloud{}_l_Z-'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_l'.format(i + 1)], config['n_f'][i + 1],
-            #                                                      W=KDNet['cloud{}_l_X-'.format(i + 1)].W,
-            #                                                      b=KDNet['cloud{}_l_X-'.format(i + 1)].b)
-            # KDNet['cloud{}_l_X+'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_l'.format(i + 1)], config['n_f'][i + 1])
-            # KDNet['cloud{}_l_Y+'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_l'.format(i + 1)], config['n_f'][i + 1],
-            #                                                      W=KDNet['cloud{}_l_X+'.format(i + 1)].W,
-            #                                                      b=KDNet['cloud{}_l_X+'.format(i + 1)].b)
-            # KDNet['cloud{}_l_Z+'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_l'.format(i + 1)], config['n_f'][i + 1],
-            #                                                      W=KDNet['cloud{}_l_X+'.format(i + 1)].W,
-            #                                                      b=KDNet['cloud{}_l_X+'.format(i + 1)].b)
-            # KDNet['cloud{}_r_X-'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_r'.format(i + 1)], config['n_f'][i + 1],
-            #                                                      W=KDNet['cloud{}_l_X-'.format(i + 1)].W,
-            #                                                      b=KDNet['cloud{}_l_X-'.format(i + 1)].b)
-            # KDNet['cloud{}_r_Y-'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_r'.format(i + 1)], config['n_f'][i + 1],
-            #                                                      W=KDNet['cloud{}_l_X-'.format(i + 1)].W,
-            #                                                      b=KDNet['cloud{}_l_X-'.format(i + 1)].b)
-            # KDNet['cloud{}_r_Z-'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_r'.format(i + 1)], config['n_f'][i + 1],
-            #                                                      W=KDNet['cloud{}_l_X-'.format(i + 1)].W,
-            #                                                      b=KDNet['cloud{}_l_X-'.format(i + 1)].b)
-            # KDNet['cloud{}_r_X+'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_r'.format(i + 1)], config['n_f'][i + 1],
-            #                                                      W=KDNet['cloud{}_l_X+'.format(i + 1)].W,
-            #                                                      b=KDNet['cloud{}_l_X+'.format(i + 1)].b)
-            # KDNet['cloud{}_r_Y+'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_r'.format(i + 1)], config['n_f'][i + 1],
-            #                                                      W=KDNet['cloud{}_l_X+'.format(i + 1)].W,
-            #                                                      b=KDNet['cloud{}_l_X+'.format(i + 1)].b)
-            # KDNet['cloud{}_r_Z+'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_r'.format(i + 1)], config['n_f'][i + 1],
-            #                                                      W=KDNet['cloud{}_l_X+'.format(i + 1)].W,
-            #                                                      b=KDNet['cloud{}_l_X+'.format(i + 1)].b)
-            #######################
-            ### Three direction ###
-            #######################
+            names = 'X-', 'Y-', 'Z-', 'X+', 'Y+', 'Z+'
 
             KDNet['cloud{}_l_X-'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_l'.format(i + 1)], config['n_f'][i + 1])
-            KDNet['cloud{}_l_Y-'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_l'.format(i + 1)], config['n_f'][i + 1])
-            KDNet['cloud{}_l_Z-'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_l'.format(i + 1)], config['n_f'][i + 1])
+            KDNet['cloud{}_l_Y-'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_l'.format(i + 1)], config['n_f'][i + 1],
+                                                                 W=KDNet['cloud{}_l_X-'.format(i + 1)].W,
+                                                                 b=KDNet['cloud{}_l_X-'.format(i + 1)].b)
+            KDNet['cloud{}_l_Z-'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_l'.format(i + 1)], config['n_f'][i + 1],
+                                                                 W=KDNet['cloud{}_l_X-'.format(i + 1)].W,
+                                                                 b=KDNet['cloud{}_l_X-'.format(i + 1)].b)
             KDNet['cloud{}_l_X+'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_l'.format(i + 1)], config['n_f'][i + 1])
-            KDNet['cloud{}_l_Y+'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_l'.format(i + 1)], config['n_f'][i + 1])
-            KDNet['cloud{}_l_Z+'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_l'.format(i + 1)], config['n_f'][i + 1])
+            KDNet['cloud{}_l_Y+'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_l'.format(i + 1)], config['n_f'][i + 1],
+                                                                 W=KDNet['cloud{}_l_X+'.format(i + 1)].W,
+                                                                 b=KDNet['cloud{}_l_X+'.format(i + 1)].b)
+            KDNet['cloud{}_l_Z+'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_l'.format(i + 1)], config['n_f'][i + 1],
+                                                                 W=KDNet['cloud{}_l_X+'.format(i + 1)].W,
+                                                                 b=KDNet['cloud{}_l_X+'.format(i + 1)].b)
             KDNet['cloud{}_r_X-'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_r'.format(i + 1)], config['n_f'][i + 1],
                                                                  W=KDNet['cloud{}_l_X-'.format(i + 1)].W,
                                                                  b=KDNet['cloud{}_l_X-'.format(i + 1)].b)
             KDNet['cloud{}_r_Y-'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_r'.format(i + 1)], config['n_f'][i + 1],
-                                                                 W=KDNet['cloud{}_l_Y-'.format(i + 1)].W,
-                                                                 b=KDNet['cloud{}_l_Y-'.format(i + 1)].b)
+                                                                 W=KDNet['cloud{}_l_X-'.format(i + 1)].W,
+                                                                 b=KDNet['cloud{}_l_X-'.format(i + 1)].b)
             KDNet['cloud{}_r_Z-'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_r'.format(i + 1)], config['n_f'][i + 1],
-                                                                 W=KDNet['cloud{}_l_Z-'.format(i + 1)].W,
-                                                                 b=KDNet['cloud{}_l_Z-'.format(i + 1)].b)
+                                                                 W=KDNet['cloud{}_l_X-'.format(i + 1)].W,
+                                                                 b=KDNet['cloud{}_l_X-'.format(i + 1)].b)
             KDNet['cloud{}_r_X+'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_r'.format(i + 1)], config['n_f'][i + 1],
                                                                  W=KDNet['cloud{}_l_X+'.format(i + 1)].W,
                                                                  b=KDNet['cloud{}_l_X+'.format(i + 1)].b)
             KDNet['cloud{}_r_Y+'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_r'.format(i + 1)], config['n_f'][i + 1],
-                                                                 W=KDNet['cloud{}_l_Y+'.format(i + 1)].W,
-                                                                 b=KDNet['cloud{}_l_Y+'.format(i + 1)].b)
+                                                                 W=KDNet['cloud{}_l_X+'.format(i + 1)].W,
+                                                                 b=KDNet['cloud{}_l_X+'.format(i + 1)].b)
             KDNet['cloud{}_r_Z+'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_r'.format(i + 1)], config['n_f'][i + 1],
-                                                                 W=KDNet['cloud{}_l_Z+'.format(i + 1)].W,
-                                                                 b=KDNet['cloud{}_l_Z+'.format(i + 1)].b)
+                                                                 W=KDNet['cloud{}_l_X+'.format(i + 1)].W,
+                                                                 b=KDNet['cloud{}_l_X+'.format(i + 1)].b)
+
+
+            # KDNet['cloud{}_l_X-'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_l'.format(i + 1)], config['n_f'][i + 1])
+            # # KDNet['cloud{}_l_X-_relu'.format(i + 1)] = NonlinearityLayer(KDNet['cloud{}_l_X-'.format(i + 1)], rectify)
+            # # KDNet['cloud{}_l_X-_out'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_l_X-_relu'.format(i + 1)],
+            # #                                                          config['n_f'][i + 1])
+            #
+            # for name in names[1:]:
+            #     name = 'cloud{}_l_'.format(i + 1) + name
+            #     KDNet[name] = SharedDotLayer(KDNet['cloud{}_l'.format(i + 1)], config['n_f'][i + 1],
+            #                                                          W=KDNet['cloud{}_l_X-'.format(i + 1)].W,
+            #                                                          b=KDNet['cloud{}_l_X-'.format(i + 1)].b)
+            #     # KDNet[name+'_relu'] = NonlinearityLayer(KDNet[name], rectify)
+            #     # KDNet[name+'_out'] = SharedDotLayer(KDNet[name+'_relu'], config['n_f'][i + 1],
+            #     #                                                      W=KDNet['cloud{}_l_X-_out'.format(i + 1)].W,
+            #     #                                                      b=KDNet['cloud{}_l_X-_out'.format(i + 1)].b)
+            #
+            # for name in names:
+            #     name = 'cloud{}_r_'.format(i + 1) + name
+            #     KDNet[name] = SharedDotLayer(KDNet['cloud{}_r'.format(i + 1)], config['n_f'][i + 1],
+            #                                                          W=KDNet['cloud{}_l_X-'.format(i + 1)].W,
+            #                                                          b=KDNet['cloud{}_l_X-'.format(i + 1)].b)
+            #     # KDNet[name + '_relu'] = NonlinearityLayer(KDNet[name], rectify)
+            #     # KDNet[name + '_out'] = SharedDotLayer(KDNet[name + '_relu'], config['n_f'][i + 1],
+            #     #                                       W=KDNet['cloud{}_l_X-_out'.format(i + 1)].W,
+            #     #                                       b=KDNet['cloud{}_l_X-_out'.format(i + 1)].b)
+
+
+            #######################
+            ### Three direction ###
+            #######################
+
+            # KDNet['cloud{}_l_X-'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_l'.format(i + 1)], config['n_f'][i + 1])
+            # KDNet['cloud{}_l_Y-'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_l'.format(i + 1)], config['n_f'][i + 1])
+            # KDNet['cloud{}_l_Z-'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_l'.format(i + 1)], config['n_f'][i + 1])
+            # KDNet['cloud{}_l_X+'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_l'.format(i + 1)], config['n_f'][i + 1])
+            # KDNet['cloud{}_l_Y+'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_l'.format(i + 1)], config['n_f'][i + 1])
+            # KDNet['cloud{}_l_Z+'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_l'.format(i + 1)], config['n_f'][i + 1])
+            # KDNet['cloud{}_r_X-'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_r'.format(i + 1)], config['n_f'][i + 1],
+            #                                                      W=KDNet['cloud{}_l_X-'.format(i + 1)].W,
+            #                                                      b=KDNet['cloud{}_l_X-'.format(i + 1)].b)
+            # KDNet['cloud{}_r_Y-'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_r'.format(i + 1)], config['n_f'][i + 1],
+            #                                                      W=KDNet['cloud{}_l_Y-'.format(i + 1)].W,
+            #                                                      b=KDNet['cloud{}_l_Y-'.format(i + 1)].b)
+            # KDNet['cloud{}_r_Z-'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_r'.format(i + 1)], config['n_f'][i + 1],
+            #                                                      W=KDNet['cloud{}_l_Z-'.format(i + 1)].W,
+            #                                                      b=KDNet['cloud{}_l_Z-'.format(i + 1)].b)
+            # KDNet['cloud{}_r_X+'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_r'.format(i + 1)], config['n_f'][i + 1],
+            #                                                      W=KDNet['cloud{}_l_X+'.format(i + 1)].W,
+            #                                                      b=KDNet['cloud{}_l_X+'.format(i + 1)].b)
+            # KDNet['cloud{}_r_Y+'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_r'.format(i + 1)], config['n_f'][i + 1],
+            #                                                      W=KDNet['cloud{}_l_Y+'.format(i + 1)].W,
+            #                                                      b=KDNet['cloud{}_l_Y+'.format(i + 1)].b)
+            # KDNet['cloud{}_r_Z+'.format(i + 1)] = SharedDotLayer(KDNet['cloud{}_r'.format(i + 1)], config['n_f'][i + 1],
+            #                                                      W=KDNet['cloud{}_l_Z+'.format(i + 1)].W,
+            #                                                      b=KDNet['cloud{}_l_Z+'.format(i + 1)].b)
 
             KDNet['cloud{}_l_X-_masked'.format(i + 1)] = ElemwiseMergeLayer([KDNet['cloud{}_l_X-'.format(i + 1)],
                                                                              KDNet['norm{}_l_X-'.format(i + 1)]], T.mul)
@@ -256,7 +280,6 @@ def iterate_minibatches(*arrays, **kwargs):
                 tmp += kwargs['t_rate']*(np.random.random(size=(len(tmp), kwargs['dim'], 1)) - 0.5)*rngs
 
         tmp_coords = tmp.copy()
-
         # return true coords for coordinate matchinf
         # batch only for kD tree
 
@@ -284,6 +307,7 @@ def iterate_minibatches(*arrays, **kwargs):
             yield [clouds] + normals[::-1] + [arrays[1][excerpt]], tmp_coords
         if kwargs['mode'] == 'test':
             yield [clouds] + normals[::-1] + [excerpt], tmp_coords
+
 
 
 def get_rotation_matrix(alpha):

@@ -10,7 +10,7 @@ import theano
 import h5py as h5
 import numpy as np
 
-from lasagne.layers import get_output, get_all_params
+from lasagne.layers import get_output, get_all_params, ReshapeLayer
 from open3d import estimate_normals, KDTreeSearchParamHybrid, compute_fpfh_feature, PointCloud, Vector3dVector
 
 from lib.KDNet import KDNetwork, iterate_minibatches
@@ -31,18 +31,23 @@ config = {
     'rotate': False, 'r_positions': 12, 'test_pos': None,
     'translate': False, 't_rate': 0.1,
     # Point clouds and kd-trees generation
-    'steps': 8,  # also control the depth of the network
+    'steps': 9,  # also control the depth of the network
     'dim': 3,
     'lim': 1,
     'det': False,
     'gamma': 10.,
     # NN options
     'input_features': 'all',  # 'all' for point coordinates, 'no' for feeding 1's as point features
-    'n_f': [16,
+    'n_f': [8, 16,
+            16,  16,
             32,  32,
-            64,  128,
-            128, 256,
-            512, 128], # representation sizes
+            64, 64,
+            128, 128], # representation sizes
+    # 'n_f': [16,
+    #         32,  32,
+    #         64,  128,
+    #         128, 256,
+    #         512, 128],
     'n_output': 10,
     'l2': 1e-3,
     'lr': 1e-3,
@@ -80,18 +85,20 @@ def generate(X, y, config):
 
     all_factors = []
     # for each factor
-    for factor in range(1, 8):
+    for factor in range(1, config['steps']):
         features_det = get_output(KDNet['cloud{}'.format(factor+1)], deterministic=True)
         features_fun = theano.function([clouds] + norms, features_det, on_unused_input='ignore')
 
         # for each batch of pointclouds
         results = []
-        for i, (batch, coords) in enumerate(iterate_minibatches(X, y, **config)):
-            # fpfh = append_FPFH(coords, 0.01)
-            # batch[0] = np.concatenate((batch[0], fpfh), axis=1)
+        for i, (batch, _) in enumerate(iterate_minibatches(X, **config)):
+
+            if config['dim'] == 36:
+                fpfh = append_FPFH(batch[0], 0.01)
+                batch[0] = np.concatenate((batch[0], fpfh), axis=1)
 
             # divide by sub-pointclouds
-            sub_pcs = coords.reshape(coords.shape[0], 3, -1, 2**factor)
+            sub_pcs = batch[0].reshape(batch[0].shape[0], config['dim'], -1, 2**factor)
 
             # take center of mass
             sub_pcs = sub_pcs.mean(axis=-1)
@@ -99,18 +106,22 @@ def generate(X, y, config):
             # take features from KD
             features = features_fun(*(batch[:-1]))
 
+            # print(sub_pcs.shape, features.shape)
+
             results.append(np.concatenate((sub_pcs, features), axis=1).transpose(0,2,1))
 
         all_factors.append(np.concatenate(results, axis=0))
 
     root = []
 
-    features_det = get_output(KDNet['cloud_fin_bn'], deterministic=True)
-    features_fun = theano.function([clouds] + norms, features_det, on_unused_input='ignore')
+    res = ReshapeLayer(model.net['cloud_fin'], (-1, config['n_f'][-1]))
+    output_det = get_output(res, deterministic=True)
+    features_fun = theano.function([clouds] + norms, output_det, on_unused_input='ignore')
 
-    for i, (batch, coords) in enumerate(iterate_minibatches(X, y, **config)):
-        # fpfh = append_FPFH(coords, 0.01)
-        # batch[0] = np.concatenate((batch[0], fpfh), axis=1)
+    for i, (batch, _) in enumerate(iterate_minibatches(X, **config)):
+        if config['dim'] == 36:
+            fpfh = append_FPFH(batch[0], 0.01)
+            batch[0] = np.concatenate((batch[0], fpfh), axis=1)
 
         # take features from KD
         features = features_fun(*(batch[:-1]))
@@ -125,14 +136,14 @@ def save(X, X_name, all_factors):
     path = '../datasets/MNIST_2D/kd_features/' + X_name + '/'
 
     np.save(path + 'X_' + X_name + '_256x3.npy', X)
-    np.save(path + 'X_' + X_name + '_128x(3+32).npy', all_factors[0])
-    np.save(path + 'X_' + X_name + '_064x(3+32).npy', all_factors[1])
-    np.save(path + 'X_' + X_name + '_032x(3+64).npy', all_factors[2])
-    np.save(path + 'X_' + X_name + '_016x(3+128).npy', all_factors[3])
-    np.save(path + 'X_' + X_name + '_008x(3+128).npy', all_factors[4])
-    np.save(path + 'X_' + X_name + '_004x(3+256).npy', all_factors[5])
-    np.save(path + 'X_' + X_name + '_002x(3+512).npy', all_factors[6])
-    np.save(path + 'X_' + X_name + '_001x128(root).npy', all_factors[7])
+    np.save(path + 'X_' + X_name + '_128x(3+32).npy', all_factors[-8])
+    np.save(path + 'X_' + X_name + '_064x(3+32).npy', all_factors[-7])
+    np.save(path + 'X_' + X_name + '_032x(3+64).npy', all_factors[-6])
+    np.save(path + 'X_' + X_name + '_016x(3+128).npy', all_factors[-5])
+    np.save(path + 'X_' + X_name + '_008x(3+128).npy', all_factors[-4])
+    np.save(path + 'X_' + X_name + '_004x(3+256).npy', all_factors[-3])
+    np.save(path + 'X_' + X_name + '_002x(3+512).npy', all_factors[-2])
+    np.save(path + 'X_' + X_name + '_001x128(root).npy', all_factors[-1])
 
 
 if __name__ == '__main__':
